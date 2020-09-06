@@ -12,11 +12,8 @@ boards = {'학사일반 게시판': domain + '/board/info_board.php',
 def showNotices(date, rows):
     i = 1
     for row in rows:
-        titleTag = row.find('td', {'class': 'left'})
-        writtenDateTag = titleTag.next_sibling.next_sibling.next_sibling.next_sibling
-        title = titleTag.get_text().replace('\n', '')
-        writtenDate = writtenDateTag.get_text()
-
+        title = row.select_one('td.left > a').get_text()
+        writtenDate = row.select_one('td:nth-child(5)').get_text()
         if int(writtenDate.replace('.', '')) >= date:
             print('[{}] {} {}'.format(i, writtenDate, title))
             i = i + 1
@@ -25,18 +22,16 @@ def showNotices(date, rows):
 
 
 def loadNotices(boardUrl):
-    html = requests.get(boardUrl)
-    bsObj = BeautifulSoup(html.text, 'html.parser')
-    html.close()
-    tbody = bsObj.find('table', {'class': 'bbs_con'}).find('tbody')
-    trows = tbody.findAll('tr')
-
+    res = requests.get(boardUrl)
+    bsObj = BeautifulSoup(res.text, 'html.parser')
+    res.close()
+    trows = bsObj.select('#content_box > div > table > tbody > tr')
     return trows
 
 
-def init():
+def crawl():
 
-    print("기준날짜 이후의 컴공게시판 공지를 가져옵니다")
+    print("기준 날짜 이후의 컴소 홈페이지 공지사항들을 불러옵니다")
     date = int(input("날짜를 입력하세요(ex: 20.09.01): ").replace('.', ''))
 
     for name, url in boards.items():
@@ -45,4 +40,4 @@ def init():
         showNotices(date, noticeRows)
 
 
-init()
+crawl()
