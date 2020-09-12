@@ -5,10 +5,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import UnexpectedAlertPresentException
 
-global i, driver
+global i, driver, loc
 i = 1
 driver = None
+loc = '#pagingPanel > span.numberLink > a '
 chromeDriverPath = 'C:/Users/SAMSUNG/Desktop/Doug/coding/python/ChromeDriver/chromedriver.exe'
 loginUrl = 'https://portal.hanyang.ac.kr/sso/lgin.do'
 portalBoardUrl = ('https://portal.hanyang.ac.kr/port.do'
@@ -16,8 +18,11 @@ portalBoardUrl = ('https://portal.hanyang.ac.kr/port.do'
                   'gqztla0kQF5NMDAzNzgxJEBeMGJlMjk1OTM2MjY0MjlkZmMzZjFiNjE4MDQ'
                   '1YmM4MTcyYjg2ODMyZGYwZDMzM2JjMGY1ZGI0NzE5OWI5MDI4YQ==')
 loginXpath = '//*[@id="hyinContents"]/div[1]/form/div/fieldset/p[3]/a'
+
 pageLinks = ['//*[@id="pagingPanel"]/span[3]/a[1]',
-             '//*[@id="pagingPanel"]/span[2]/a[2]']
+             '//*[@id="pagingPanel"]/span[2]/a[2]',
+             '//*[@id="pagingPanel"]/span[2]/a[3]',
+             '//*[@id="pagingPanel"]/span[2]/a[4]']
 
 
 def showNotices(date):
@@ -44,21 +49,49 @@ def waitLoading(sec, elem, loc):
 
 
 def waitAndShowNotices(link, date):
+    global loc
     driver.find_element_by_xpath(link).click()
-    waitLoading(10, By.CSS_SELECTOR,
-                '#mainGrid > tbody > tr:nth-child(10)')
+    waitLoading(10, By.CSS_SELECTOR, loc + '+ span')
+    loc = loc + '+ a '
     showNotices(date)
 
 
+def handlePopUp():
+    alert = Alert(driver)
+    alert.dismiss()  # sometimes NoAlertPersentException occurs
+
+
 def login(loginUrl):
-    identifier = input("아이디: ")
-    password = input('비밀번호: ')
     driver.get(loginUrl)
     driver.find_element_by_xpath(
         '/html/body/div[1]/p').click()  # COVID-19 page
+
+    identifier = input("Id: ")
+    password = input('Password: ')
     driver.find_element_by_name('userId').send_keys(identifier)
     driver.find_element_by_name('password').send_keys(password)
     driver.find_element_by_xpath(loginXpath).click()
+
+    # handle COVID-19 self-check page and sex education pop-up
+    popUpHandled = False
+    checked = False
+    try:
+        WebDriverWait(driver, 3).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '#mainForm > div.title.mb-10 > span')))
+    except TimeoutException:
+        checked = True
+    except UnexpectedAlertPresentException:
+        checked = True
+        popUpHandled = True
+
+    if not checked:
+        for num in range(37, 43):
+            driver.find_element_by_xpath(
+                '//*[@id="c{}_b"]'.format(num)).click()
+        driver.find_element_by_xpath('//*[@id="btn_confirm"]').click()
+
+    if not popUpHandled:  # need to be revised
+        handlePopUp()
 
 
 def setDriver():
@@ -79,9 +112,7 @@ def crawl():
     global driver
     date = getDate()
     driver = setDriver()
-    alert = Alert(driver)
     login(loginUrl)
-    alert.dismiss()  # sometimes NoAlertPersentException occurs
 
     # first page
     driver.get(portalBoardUrl)
@@ -89,9 +120,9 @@ def crawl():
                 '#mainGrid > tbody > tr:nth-child(10)')
     showNotices(date)
 
-    # after pages
-    for link in pageLinks:
-        waitAndShowNotices(link, date)
+    # until 3 pages
+    for pageLink in pageLinks[0:2]:
+        waitAndShowNotices(pageLink, date)
 
     driver.close()
 
